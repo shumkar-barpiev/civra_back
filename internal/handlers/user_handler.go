@@ -41,34 +41,6 @@ func CreateUser(c *gin.Context) {
 	Created(c, user.ToResponse(), "User created successfully")
 }
 
-
-// LoginUser handles user authentication
-func LoginUser(c *gin.Context) {
-	var loginReq models.UserLoginRequest
-
-	if err := c.ShouldBindJSON(&loginReq); err != nil {
-		Error(c, http.StatusBadRequest, "Invalid input")
-		return
-	}
-
-	var user models.User
-	if err := database.DB.Where("email = ?", loginReq.Email).First(&user).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			Error(c, http.StatusUnauthorized, "Invalid email or password")
-			return
-		}
-		Error(c, http.StatusInternalServerError, "Database error")
-		return
-	}
-
-	if !user.CheckPassword(loginReq.Password) {
-		Error(c, http.StatusUnauthorized, "Invalid email or password")
-		return
-	}
-
-	Success(c, user.ToResponse(), "Login successful")
-}
-
 // GetUser retrieves a user by ID
 func GetUser(c *gin.Context) {
 	idParam := c.Param("id")
@@ -106,3 +78,20 @@ func GetUsers(c *gin.Context) {
 
 	Success(c, userResponses, "Users fetched successfully")
 }
+// Get current user profile
+func GetProfile(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		Error(c, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	var user models.User
+	if err := database.DB.First(&user, userID).Error; err != nil {
+		Error(c, http.StatusNotFound, "User not found")
+		return
+	}
+
+	Success(c, user.ToResponse(), "Profile fetched successfully")
+}
+
