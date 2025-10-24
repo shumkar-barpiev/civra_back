@@ -16,123 +16,86 @@ func CreateUser(c *gin.Context) {
 	var userReq models.UserCreateRequest
 
 	if err := c.ShouldBindJSON(&userReq); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid input",
-			"details": err.Error(),
-		})
+		Error(c, http.StatusBadRequest, "Invalid input")
 		return
 	}
 
 	// Check if user already exists
 	var existingUser models.User
 	if err := database.DB.Where("email = ? OR username = ?", userReq.Email, userReq.Username).First(&existingUser).Error; err == nil {
-		c.JSON(http.StatusConflict, gin.H{
-			"error": "User with this email or username already exists",
-		})
+		Error(c, http.StatusConflict, "User with this email or username already exists")
 		return
 	}
 
-	// Create user
 	user := models.User{
 		Username: userReq.Username,
 		Email:    userReq.Email,
-		Password: userReq.Password, // This will be hashed by the BeforeCreate hook
+		Password: userReq.Password,
 	}
 
-	result := database.DB.Create(&user)
-	if result.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Could not create user",
-			"details": result.Error.Error(),
-		})
+	if err := database.DB.Create(&user).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "Could not create user")
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "User created successfully",
-		"user":    user.ToResponse(),
-	})
+	Created(c, user.ToResponse(), "User created successfully")
 }
+
 
 // LoginUser handles user authentication
 func LoginUser(c *gin.Context) {
 	var loginReq models.UserLoginRequest
 
 	if err := c.ShouldBindJSON(&loginReq); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid input",
-			"details": err.Error(),
-		})
+		Error(c, http.StatusBadRequest, "Invalid input")
 		return
 	}
 
-	// Find user by email
 	var user models.User
 	if err := database.DB.Where("email = ?", loginReq.Email).First(&user).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Invalid email or password",
-			})
+			Error(c, http.StatusUnauthorized, "Invalid email or password")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Database error",
-		})
+		Error(c, http.StatusInternalServerError, "Database error")
 		return
 	}
 
-	// Check password
 	if !user.CheckPassword(loginReq.Password) {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "Invalid email or password",
-		})
+		Error(c, http.StatusUnauthorized, "Invalid email or password")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Login successful",
-		"user":    user.ToResponse(),
-	})
+	Success(c, user.ToResponse(), "Login successful")
 }
 
 // GetUser retrieves a user by ID
 func GetUser(c *gin.Context) {
-	var user models.User
-	userID := c.Param("id")
-
-	id, err := strconv.ParseUint(userID, 10, 32)
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid user ID",
-		})
+		Error(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
-	result := database.DB.First(&user, uint(id))
-	if result.Error != nil {
-		if result.Error == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"error": "User not found",
-			})
+	var user models.User
+	if err := database.DB.First(&user, uint(id)).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			Error(c, http.StatusNotFound, "User not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Database error",
-		})
+		Error(c, http.StatusInternalServerError, "Database error")
 		return
 	}
 
-	c.JSON(http.StatusOK, user.ToResponse())
+	Success(c, user.ToResponse(), "User retrieved successfully")
 }
 
 // GetUsers retrieves all users (for testing)
 func GetUsers(c *gin.Context) {
 	var users []models.User
-	result := database.DB.Find(&users)
-	if result.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Could not fetch users",
-		})
+	if err := database.DB.Find(&users).Error; err != nil {
+		Error(c, http.StatusInternalServerError, "Could not fetch users")
 		return
 	}
 
@@ -141,5 +104,5 @@ func GetUsers(c *gin.Context) {
 		userResponses = append(userResponses, user.ToResponse())
 	}
 
-	c.JSON(http.StatusOK, userResponses)
+	Success(c, userResponses, "Users fetched successfully")
 }

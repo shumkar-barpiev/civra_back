@@ -63,15 +63,7 @@ func main() {
 		port = "8080"
 	}
 
-	// Start server
-	log.Printf("🌐 Server starting on :%s", port)
-	log.Printf("📚 API Documentation:")
-	log.Printf("   POST /api/users/register - Register a new user")
-	log.Printf("   POST /api/users/login    - User login")
-	log.Printf("   GET  /api/users/:id      - Get user by ID")
-	log.Printf("   GET  /health             - Health check")
-
 	if err := r.Run(":" + port); err != nil {
-		log.Fatal("❌ Failed to start server:", err)
+		log.Fatal("Failed to start server:", err)
 	}
 }
